@@ -12,6 +12,7 @@ internal partial class SupplyService
         supply.Date ??= DateTime.UtcNow;
         supply.UpdatedState ??= DateTime.UtcNow;
         var dbEntity = supply.ConvertToDbEntity<Supply>();
+        dbEntity.Number = dataBase.Supplies.Count(s => s.SupplierId == supply.SupplierId) + 1;
         dataBase.Supplies.Add(dbEntity);
         dataBase.SaveChanges();
         supply.Id = dbEntity.Id;
@@ -26,6 +27,7 @@ internal partial class SupplyService
         {
             return;
         }
+
         if (existing.State != supply.State)
         {
             supply.UpdatedState ??= DateTime.UtcNow;
@@ -35,7 +37,10 @@ internal partial class SupplyService
                 itemService.RemoveSupply(supply.Id);
             }
         }
+
+        var num = existing.Number;
         existing.CopyPossibleProperties(supply);
+        existing.Number = num;
         UpdateRows(supply);
         HandleReceivedItems(supply);
     }
@@ -48,10 +53,11 @@ internal partial class SupplyService
             {
                 rowService.Delete(row);
             }
+
             dataBase.SaveChanges();
             return;
         }
-        
+
         var existingRows = newItem ? [] : rowService.GetBySupply(supply.Id);
         foreach (var row in supply.Rows)
         {
@@ -132,21 +138,7 @@ internal partial class SupplyService
         itemService.Delete(removal);
         existing = existing.Take(existing.Count + difference).ToList();
     }
-    
-    private void UpdateItemDetails(IEnumerable<Item> items, 
-        ItemState state = ItemState.Available, 
-        Guid? orderId = null, 
-        decimal price = 0)
-    {
-        foreach (var item in items)
-        {
-            item.State = state;
-            item.OrderId = orderId;
-            item.SalePrice = price;
-            dataBase.Items.Update(item);
-        }
-    }
-    
+
     private Item CreateItemFromRow(SupplyRow row)
     {
         var item = new Item();
@@ -167,7 +159,14 @@ internal partial class SupplyService
         {
             rowService.Delete(row);
         }
+        
+        var shift = dataBase.Supplies.Where(s => s.SupplierId == supply.SupplierId && s.Number > supply.Number).ToList();
+        foreach (var shiftedSupply in shift)
+        {
+            shiftedSupply.Number--;
+        }
         dataBase.Supplies.Remove(supply);
+        dataBase.Supplies.UpdateRange(shift);
     }
 
     internal void DeleteSupply(Guid supplyId)
@@ -175,11 +174,38 @@ internal partial class SupplyService
         DeleteSupply(dataBase.Supplies.FirstOrDefault(s => s.Id == supplyId));
     }
 
-    public Supply GetSupply(Guid supplyId)
+
+    private record DbSumForSupply(
+        Guid SupplyId,
+        int SoldCount,
+        decimal SoldMoney);
+
+    private Dictionary<Guid, DbSumForSupply> GetSupplyItemsInfo(List<Guid> ids = null)
     {
-        return dataBase.Supplies.Include(s => s.Rows).FirstOrDefault(s => s.Id == supplyId);
+        var query = ids == null ? dataBase.Items : dataBase.Items.Where(i => ids.Contains(i.SupplyId)); 
+        var q = query.GroupBy(i => i.SupplyId)
+            .Select(g => new DbSumForSupply(
+                g.Key,
+                g.Sum(i => i.OrderId == null ? 0 : 1),
+                g.Sum(i => i.SalePrice))
+            );
+        return q.ToList().ToDictionary(i => i.SupplyId);
     }
-    
+
+    public SupplyResponse GetSupply(Guid supplyId)
+    {
+        var dbSupply = dataBase.Supplies.Include(s => s.Rows).FirstOrDefault(s => s.Id == supplyId);
+        var supply = dbSupply.ConvertFromDbEntity<SupplyResponse>();
+        supply.Rows = dbSupply.Rows;
+        var sum = GetSupplyItemsInfo([supplyId]).GetValueOrDefault(supplyId);
+        if (sum != null)
+        {
+            supply.CopyPossibleProperties(sum);
+        }
+
+        return supply;
+    }
+
     void ISupplyService.AddSupply(SupplyRequest supply)
     {
         AddSupply(supply);
@@ -204,10 +230,23 @@ internal partial class SupplyService
         dataBase.SaveChanges();
     }
 
-    public List<Supply> GetSupplies(Guid? supplierId)
+    public List<SupplyResponse> GetSupplies(Guid? supplierId)
     {
-        return supplierId == null
-            ? dataBase.Supplies.ToList()
-            : dataBase.Supplies.Where(s => s.SupplierId == supplierId).ToList();
+        var supplies = supplierId == null
+            ? dataBase.Supplies.Include(s => s.Rows).OrderByDescending(s => s.Date).ToList()
+            : dataBase.Supplies.Include(s => s.Rows).OrderByDescending(s => s.Date).Where(s => s.SupplierId == supplierId).ToList();
+        var ids = supplierId == null ? null : supplies.Select(s => s.Id).ToList();
+        var info = GetSupplyItemsInfo(ids);
+        return supplies.Select(s =>
+        {
+            var supply = s.ConvertFromDbEntity<SupplyResponse>();
+            supply.Rows = s.Rows;
+            var sum = info.GetValueOrDefault(s.Id);
+            if (sum != null)
+            {
+                supply.CopyPossibleProperties(sum);
+            }
+            return supply;
+        }).ToList();
     }
 }

@@ -22,6 +22,8 @@ public class Supply: IDbEntity
     public Guid SupplierId { get; set; }
     [ForeignKey("SupplierId"), JsonIgnore]
     public Supplier Supplier { get; set; }
+    [Required]
+    public int Number { get; set; }
     public virtual ICollection<SupplyRow> Rows { get; set; }
 
     public SupplyState State { get; set; } = SupplyState.Paid;

@@ -13,7 +13,8 @@ public class OrdersController: ControllerBase
     public IActionResult GetAllOrders()
     {
         using var dataService = new DataService();
-        return Ok(dataService.Orders.GetAll());
+        var orders = dataService.Orders.GetAll();
+        return Ok(orders);
     }
 
     [HttpGet("{id}")]
@@ -24,18 +25,9 @@ public class OrdersController: ControllerBase
         var order = dataService.Orders.Get(id);
         if (order == null)
         {
-            throw new KeyNotFoundException("There's no Sale with such an Id");
+            throw new KeyNotFoundException("There's no order with such an Id");
         }
-
-        return Ok(new OrderRequest(order)
-        {
-            Rows = dataService.Items.GetByOrder(id).GroupBy(i => i.ProductId).Select(g => new OrderRow()
-            {
-                ProductId = g.Key,
-                Quantity = g.Count(),
-                Price = g.First().SalePrice
-            }).ToList()
-        });
+        return Ok(order);
     }
 
     [HttpPost]
@@ -43,7 +35,7 @@ public class OrdersController: ControllerBase
     {
         using var dataService = new DataService();
         dataService.Orders.Add(order);
-        return Ok(order);
+        return GetOrder(order.Id);
     }
     
     [HttpPut]

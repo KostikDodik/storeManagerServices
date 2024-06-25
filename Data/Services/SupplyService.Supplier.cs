@@ -12,8 +12,8 @@ public interface ISupplyService
     void UpdateSupplier(Supplier supplier);
     void DeleteSupplier(Supplier supplier);
     void DeleteSupplier(Guid supplierId);
-    List<Supply> GetSupplies(Guid? supplierId = null);
-    Supply GetSupply(Guid supplyId);
+    List<SupplyResponse> GetSupplies(Guid? supplierId = null);
+    SupplyResponse GetSupply(Guid supplyId);
     void AddSupply(SupplyRequest supply);
     void UpdateSupply(SupplyRequest supply);
     void DeleteSupply(Supply supply);

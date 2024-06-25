@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Model.Database;
+﻿using Model.Database;
 using Model.Extentions;
 using Model.Requests;
 
@@ -8,7 +7,7 @@ namespace Data.Services;
 public interface IOrderService
 {
     List<OrderResponse> GetAll();
-    Order Get(Guid id);
+    OrderResponse Get(Guid id);
     Order Add(OrderRequest order);
     void Update(OrderRequest order);
     void Delete(Order order);
@@ -86,6 +85,7 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         var dbOrder = order as Order;
         dbOrder.Date = order.Date ??= DateTime.UtcNow;
         dbOrder.UpdatedState = order.UpdatedState ??= DateTime.UtcNow;
+        dbOrder.Number = dataBase.Orders.Count(o => o.SalePlatformId == order.SalePlatformId) + 1;
         dataBase.Orders.Add(dbOrder);
         dataBase.SaveChanges();
         HandleOrderItems(order);
@@ -106,41 +106,59 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
             order.UpdatedState ??= DateTime.UtcNow;
         }
 
+        var num = existing.Number;
         existing.CopyPossibleProperties(order);
+        existing.Number = num;
         dataBase.Orders.Update(existing);
         dataBase.SaveChanges();
         HandleOrderItems(order, true);
         dataBase.SaveChanges();
     }
-
-    void IOrderService.Delete(Order order)
+    
+    internal void Delete(Order order)
     {
+        var shift = dataBase.Orders.Where(o => o.SalePlatformId == order.SalePlatformId && o.Number > order.Number).ToList();
+        foreach (var shiftedOrder in shift)
+        {
+            shiftedOrder.Number--;
+        }
+        itemService.RemoveOrder(order.Id);
         dataBase.Orders.Remove(order);
+        dataBase.Orders.UpdateRange(shift);
         dataBase.SaveChanges();
     }
+
+    void IOrderService.Delete(Order order) => Delete(order);
 
     void IOrderService.Delete(Guid id)
     {
         var order = dataBase.Orders.FirstOrDefault(p => p.Id == id);
         if (order != null)
         {
-            itemService.RemoveOrder(id);
-            dataBase.Orders.Remove(order);
-            dataBase.SaveChanges();
+            Delete(order);
         }
     }
 
     private record DbSumByOrder(Guid? OrderId, decimal TotalSum, decimal Income);
 
-    List<OrderResponse> IOrderService.GetAll()
+    private Dictionary<Guid?, DbSumByOrder> getDbSumByOrders(List<Guid> ids = null)
     {
-        var orders = dataBase.Orders.ToList();
-        var query = dataBase.Items.Where(i => i.OrderId != null).GroupBy(i => i.OrderId)
+        var query = ids == null
+            ? dataBase.Items.Where(i => i.OrderId != null)
+            : dataBase.Items.Where(i => i.OrderId != null && ids.Contains(i.OrderId.Value));
+        return query.GroupBy(i => i.OrderId)
             .Select(g => new DbSumByOrder(
                 g.Key,
                 g.Sum(i => i.SalePrice),
-                g.Sum(i => i.SalePrice - i.DeliveryPrice - i.SupplyPrice)));
-        var items = query.ToList().ToDictionary(i => i.OrderId);
+                g.Sum(i => i.SalePrice - i.DeliveryPrice - i.SupplyPrice))).ToList()
+            .ToDictionary(i => i.OrderId);
+    }
+    
+
+    List<OrderResponse> IOrderService.GetAll()
+    {
+        var orders = dataBase.Orders.OrderByDescending(o => o.Date).ToList();
+        var items = getDbSumByOrders();
         
         return orders.Select(o =>
         {
@@ -153,5 +171,24 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         }).ToList();
     }
 
-    Order IOrderService.Get(Guid id) => dataBase.Orders.FirstOrDefault(s => s.Id == id);
+    OrderResponse IOrderService.Get(Guid id)
+    {
+        var order = dataBase.Orders.FirstOrDefault(s => s.Id == id);
+        if (order == null)
+        {
+            return null;
+        }
+        var item = getDbSumByOrders([id]).GetValueOrDefault(id);
+        return new OrderResponse(order)
+        {
+            TotalCheck = item?.TotalSum ?? 0,
+            TotalIncome = item?.Income ?? 0,
+            Rows = itemService.GetByOrder(id).GroupBy(i => i.ProductId).Select(g => new OrderRow
+            {
+                ProductId = g.Key,
+                Quantity = g.Count(),
+                Price = g.First().SalePrice
+            }).ToList()
+        };
+    }
 }

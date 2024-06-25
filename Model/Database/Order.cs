@@ -21,6 +21,8 @@ public class Order: IDbEntity
     public Guid SalePlatformId { get; set; }
     [ForeignKey("SalePlatformId")]
     public SalePlatform SalePlatform { get; set; }
+    [Required]
+    public int Number { get; set; }
 
     public ItemState State { get; set; } = ItemState.Ordered;
 }
