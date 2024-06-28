@@ -44,6 +44,10 @@ public class DataService : IDisposable, IAsyncDisposable
     private OrderService orders => _orders ??= new OrderService(dbContext, items);
     public IOrderService Orders => orders;
     
+    private StatisticsService _statistics;
+    private StatisticsService statistics => _statistics ??= new StatisticsService(dbContext);
+    public IStatisticsService Statistics => statistics;
+    
 
     public void Dispose()
     {
