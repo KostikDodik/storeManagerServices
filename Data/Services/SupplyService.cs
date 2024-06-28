@@ -5,7 +5,17 @@ using Model.Requests;
 
 namespace Data.Services;
 
-internal partial class SupplyService
+public interface ISupplyService
+{
+    List<SupplyResponse> GetAll(Guid? supplierId = null);
+    SupplyResponse Get(Guid supplyId);
+    void Add(SupplyRequest supply);
+    void Update(SupplyRequest supply);
+    void Delete(Supply supply);
+    void Delete(Guid supplyId);
+}
+
+internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService, ItemService itemService) : ISupplyService
 {
     internal void AddSupply(SupplyRequest supply)
     {
@@ -192,9 +202,15 @@ internal partial class SupplyService
         return q.ToList().ToDictionary(i => i.SupplyId);
     }
 
-    public SupplyResponse GetSupply(Guid supplyId)
+    public SupplyResponse Get(Guid supplyId)
     {
         var dbSupply = dataBase.Supplies.Include(s => s.Rows).FirstOrDefault(s => s.Id == supplyId);
+        if (dbSupply == null)
+        {
+            return null;
+        }
+        UpdateSoldOutState([dbSupply]);
+        
         var supply = dbSupply.ConvertFromDbEntity<SupplyResponse>();
         supply.Rows = dbSupply.Rows;
         var sum = GetSupplyItemsInfo([supplyId]).GetValueOrDefault(supplyId);
@@ -202,39 +218,39 @@ internal partial class SupplyService
         {
             supply.CopyPossibleProperties(sum);
         }
-
         return supply;
     }
 
-    void ISupplyService.AddSupply(SupplyRequest supply)
+    void ISupplyService.Add(SupplyRequest supply)
     {
         AddSupply(supply);
         dataBase.SaveChanges();
     }
 
-    void ISupplyService.UpdateSupply(SupplyRequest supply)
+    void ISupplyService.Update(SupplyRequest supply)
     {
         UpdateSupply(supply);
         dataBase.SaveChanges();
     }
 
-    void ISupplyService.DeleteSupply(Guid supplyId)
+    void ISupplyService.Delete(Guid supplyId)
     {
         DeleteSupply(supplyId);
         dataBase.SaveChanges();
     }
 
-    void ISupplyService.DeleteSupply(Supply supply)
+    void ISupplyService.Delete(Supply supply)
     {
         DeleteSupply(dataBase.Supplies.FirstOrDefault(s => s.Id == supply.Id));
         dataBase.SaveChanges();
     }
 
-    public List<SupplyResponse> GetSupplies(Guid? supplierId)
+    public List<SupplyResponse> GetAll(Guid? supplierId)
     {
         var supplies = supplierId == null
             ? dataBase.Supplies.Include(s => s.Rows).OrderByDescending(s => s.Date).ToList()
             : dataBase.Supplies.Include(s => s.Rows).OrderByDescending(s => s.Date).Where(s => s.SupplierId == supplierId).ToList();
+        UpdateSoldOutState(supplies);
         var ids = supplierId == null ? null : supplies.Select(s => s.Id).ToList();
         var info = GetSupplyItemsInfo(ids);
         return supplies.Select(s =>
@@ -248,5 +264,21 @@ internal partial class SupplyService
             }
             return supply;
         }).ToList();
+    }
+
+    private void UpdateSoldOutState(List<Supply> supplies)
+    {
+        supplies = supplies.Where(s => s.State != SupplyState.SoldOut).ToList();
+        var supplyIds = supplies.Select(s => s.Id).ToList();
+        var soldOutItems = itemService.CheckSoldOutForSupply(supplyIds);
+        foreach (var supply in supplies)
+        {
+            if (soldOutItems.TryGetValue(supply.Id, out var soldOut) && soldOut)
+            {
+                supply.State = SupplyState.SoldOut;
+                dataBase.Supplies.Update(supply);
+            }
+        }
+        dataBase.SaveChanges();
     }
 }

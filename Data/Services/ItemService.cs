@@ -173,4 +173,18 @@ internal class ItemService(DataDbContext dataBase) : IItemService
 
     public List<Item> GetByOrder(Guid orderId) => 
         dataBase.Items.Where(i => i.OrderId == orderId).ToList();
+
+    internal Dictionary<Guid, bool> CheckSoldOutForSupply(List<Guid> ids)
+    {
+        if (ids == null || ids.Count == 0)
+        {
+            return new Dictionary<Guid, bool>();
+        }
+        return dataBase.Items.Where(i => ids.Contains(i.SupplyId)).GroupBy(i => i.SupplyId)
+            .Select(gr => new
+            {
+                Id = gr.Key,
+                Value = gr.Any() && gr.All(i => i.State == ItemState.Finished)
+            }).ToList().ToDictionary(o => o.Id, o => o.Value);
+    }
 }

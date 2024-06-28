@@ -12,21 +12,21 @@ public class SuppliersController: ControllerBase
     public IActionResult GetAllSuppliers()
     {
         using var dataService = new DataService();
-        return Ok(dataService.Supplies.GetSuppliers());
+        return Ok(dataService.Suppliers.GetAll());
     }
 
     [HttpGet("{id}")]
     public IActionResult GetSupplier(Guid id)
     {
         using var dataService = new DataService();
-        return Ok(dataService.Supplies.GetSupplier(id));
+        return Ok(dataService.Suppliers.Get(id));
     }
 
     [HttpPost]
     public IActionResult AddSupplier(Supplier supplier)
     {
         using var dataService = new DataService();
-        dataService.Supplies.AddSupplier(supplier);
+        dataService.Suppliers.Add(supplier);
         return CreatedAtAction("GetSupplier", new { id = supplier.Id }, supplier);
     }
     
@@ -34,7 +34,7 @@ public class SuppliersController: ControllerBase
     public IActionResult UpdateSupplier(Supplier supplier)
     {
         using var dataService = new DataService();
-        dataService.Supplies.UpdateSupplier(supplier);
+        dataService.Suppliers.Update(supplier);
         return CreatedAtAction("GetSupplier", new { id = supplier.Id }, supplier);
     }
 
@@ -42,7 +42,7 @@ public class SuppliersController: ControllerBase
     public IActionResult DeleteSupplier(Guid id)
     {
         using var dataService = new DataService();
-        dataService.Supplies.DeleteSupplier(id);
+        dataService.Suppliers.Delete(id);
         return NoContent();
     }
 }

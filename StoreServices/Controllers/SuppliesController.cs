@@ -13,21 +13,21 @@ public class SuppliesController: ControllerBase
     public IActionResult GetAllSupplies()
     {
         using var dataService = new DataService();
-        return Ok(dataService.Supplies.GetSupplies());
+        return Ok(dataService.Supplies.GetAll());
     }
 
     [HttpGet("{id}")]
     public IActionResult GetSupply(Guid id)
     {
         using var dataService = new DataService();
-        return Ok(dataService.Supplies.GetSupply(id));
+        return Ok(dataService.Supplies.Get(id));
     }
 
     [HttpPost]
     public IActionResult AddSupply(SupplyRequest supply)
     {
         using var dataService = new DataService();
-        dataService.Supplies.AddSupply(supply);
+        dataService.Supplies.Add(supply);
         return CreatedAtAction("GetSupply", new { id = supply.Id }, supply);
     }
     
@@ -35,7 +35,7 @@ public class SuppliesController: ControllerBase
     public IActionResult UpdateSupply(SupplyRequest supply)
     {
         using var dataService = new DataService();
-        dataService.Supplies.UpdateSupply(supply);
+        dataService.Supplies.Update(supply);
         return Ok(supply);
     }
 
@@ -43,7 +43,7 @@ public class SuppliesController: ControllerBase
     public IActionResult DeleteSupply(Guid id)
     {
         using var dataService = new DataService();
-        dataService.Supplies.DeleteSupply(id);
+        dataService.Supplies.Delete(id);
         return NoContent();
     }
 }

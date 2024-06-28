@@ -27,6 +27,10 @@ public class DataService : IDisposable, IAsyncDisposable
     private ItemService _items;
     private ItemService items => _items ??= new ItemService(dbContext);
     public IItemService Items => items;
+
+    private SupplierService _suppliers;
+    private SupplierService suppliers => _suppliers ??= new SupplierService(dbContext);
+    public ISupplierService Suppliers => suppliers;
     
 
     private SupplyRowService _supplyRows;
