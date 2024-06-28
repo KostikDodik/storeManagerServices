@@ -28,7 +28,7 @@ public class SuppliesController: ControllerBase
     {
         using var dataService = new DataService();
         dataService.Supplies.Add(supply);
-        return CreatedAtAction("GetSupply", new { id = supply.Id }, supply);
+        return GetSupply(supply.Id);
     }
     
     [HttpPut]
@@ -36,7 +36,7 @@ public class SuppliesController: ControllerBase
     {
         using var dataService = new DataService();
         dataService.Supplies.Update(supply);
-        return Ok(supply);
+        return GetSupply(supply.Id);
     }
 
     [HttpDelete("{id}")]
