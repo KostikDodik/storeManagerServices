@@ -100,12 +100,12 @@ internal class StatisticsService(DataDbContext dataBase) : IStatisticsService
             {
                 BoughtCount = gr.Sum(row =>
                     (startDate == null || row.Supply.Date >= startDate)
-                    && (endDate == null || row.Supply.Date <= startDate)
+                    && (endDate == null || row.Supply.Date <= endDate)
                         ? row.Count
                         : 0),
                 BoughtSum = gr.Sum(row =>
                     (startDate == null || row.Supply.Date >= startDate)
-                    && (endDate == null || row.Supply.Date <= startDate)
+                    && (endDate == null || row.Supply.Date <= endDate)
                         ? row.Count * (row.SupplyPrice + row.DeliveryPrice)
                         : 0),
                 ReceivedCount = gr.Sum(row =>
