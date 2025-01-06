@@ -20,6 +20,7 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
     {
         var availableDic = itemService.GetAvailableGroupedByProduct(order.Rows.Select(r => r.ProductId).ToArray());
         var existingDic = edit ? itemService.GetGroupedByOrder(order.Id) : null;
+        var productIds = new List<Guid>();
         foreach (var orderRow in order.Rows)
         {
             var existing = edit ? existingDic.GetValueOrDefault(orderRow.ProductId) : null;
@@ -31,10 +32,17 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
             }
             else if (difference < 0)
             {
-                RemoveSurplusItems(ref existing, difference);
+                RemoveSurplusItems(ref existing, -difference);
             }
-
             UpdateExistingItems(existing, order, orderRow);
+            productIds.Add(orderRow.ProductId);
+        }
+
+        if (existingDic != null)
+        {
+            var removed = existingDic.Where(p => !productIds.Contains(p.Key))
+                .SelectMany(p => p.Value).ToList();
+            RemoveSurplusItems(ref removed);
         }
     }
 
@@ -52,9 +60,9 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         UpdateItemDetails(available.Take(difference), order.State, order.Id, orderRow.Price);
     }
 
-    private void RemoveSurplusItems(ref List<Item> existing, int difference)
+    private void RemoveSurplusItems(ref List<Item> existing, int? difference = null)
     {
-        UpdateItemDetails(existing!.TakeLast(-difference));
+        UpdateItemDetails(existing!.TakeLast(difference ?? existing.Count));
         existing = existing.TakeWhile(i => i.OrderId != null).ToList();
     }
 
