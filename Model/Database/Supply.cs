@@ -14,6 +14,8 @@ public class Supply: IDbEntity
     public DateTime Date { get; set; }
     [Required]
     public DateTime UpdatedState { get; set; }
+    [Required]
+    public DateTime DateEdited { get; set; }
     
     public string TrackingNumber { get; set; }
     public string Name { get; set; }

@@ -85,6 +85,7 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         var dbOrder = order as Order;
         dbOrder.Date = order.Date ??= DateTime.UtcNow;
         dbOrder.UpdatedState = order.UpdatedState ??= DateTime.UtcNow;
+        dbOrder.DateEdited = DateTime.UtcNow;
         dbOrder.Number = dataBase.Orders.Count(o => o.SalePlatformId == order.SalePlatformId) + 1;
         dataBase.Orders.Add(dbOrder);
         dataBase.SaveChanges();
@@ -101,6 +102,7 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
             return;
         }
 
+        order.DateEdited = DateTime.UtcNow;
         if (existing.State != order.State)
         {
             order.UpdatedState ??= DateTime.UtcNow;

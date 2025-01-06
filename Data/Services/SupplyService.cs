@@ -21,6 +21,7 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
     {
         supply.Date ??= DateTime.UtcNow;
         supply.UpdatedState ??= DateTime.UtcNow;
+        supply.DateEdited = DateTime.UtcNow;
         var dbEntity = supply.ConvertToDbEntity<Supply>();
         dbEntity.Number = dataBase.Supplies.Count(s => s.SupplierId == supply.SupplierId) + 1;
         dataBase.Supplies.Add(dbEntity);
@@ -37,6 +38,7 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         {
             return;
         }
+        supply.DateEdited = DateTime.UtcNow;
 
         if (existing.State != supply.State)
         {
@@ -98,6 +100,7 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
 
         var existingDic = itemService.GetBySupply(supply.Id).GroupBy(i => i.ProductId)
             .ToDictionary(g => g.Key, g => g.ToList());
+        var productIds = new List<Guid>();
         foreach (var row in supply.Rows)
         {
             var existing = existingDic.GetValueOrDefault(row.ProductId);
@@ -113,7 +116,10 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
             }
 
             UpdateExistingItems(existing, row, supply);
+            productIds.Add(row.ProductId);
         }
+        itemService.Delete(existingDic.Where(p => !productIds.Contains(p.Key))
+            .SelectMany(p => p.Value).ToList());
 
         dataBase.SaveChanges();
     }
@@ -169,6 +175,7 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         {
             rowService.Delete(row);
         }
+        itemService.RemoveSupply(supply.Id);
         
         var shift = dataBase.Supplies.Where(s => s.SupplierId == supply.SupplierId && s.Number > supply.Number).ToList();
         foreach (var shiftedSupply in shift)
