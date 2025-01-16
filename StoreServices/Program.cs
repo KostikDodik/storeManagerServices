@@ -9,20 +9,11 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-});
+}).AddControllersAsServices();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Policies",
-        builder => builder.WithOrigins(
-            "https://localhost:44371",
-            "https://localhost:5174", 
-            "http://localhost:5174", 
-            "https://localhost:5175", 
-            "http://localhost:5175", 
-            "http://192.168.0.109", 
-            "http://localhost:5173",
-            "https://localhost:5173",
-            "https://192.168.0.109").AllowAnyMethod().AllowAnyHeader().AllowCredentials());
+        builder => builder.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 var app = builder.Build();
 app.UseCors("Policies");

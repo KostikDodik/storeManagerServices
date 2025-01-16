@@ -10,8 +10,10 @@ public interface IOrderService
     OrderResponse Get(Guid id);
     Order Add(OrderRequest order);
     void Update(OrderRequest order);
-    void Delete(Order order);
-    void Delete(Guid saleId);
+    /// <returns>List of removed products</returns>
+    List<Guid> Delete(Order order);
+    /// <returns>List of removed products</returns>
+    List<Guid> Delete(Guid saleId);
 }
 
 internal class OrderService(DataDbContext dataBase, ItemService itemService) : IOrderService
@@ -125,28 +127,26 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         dataBase.SaveChanges();
     }
     
-    internal void Delete(Order order)
+    internal List<Guid> Delete(Order order)
     {
         var shift = dataBase.Orders.Where(o => o.SalePlatformId == order.SalePlatformId && o.Number > order.Number).ToList();
         foreach (var shiftedOrder in shift)
         {
             shiftedOrder.Number--;
         }
-        itemService.RemoveOrder(order.Id);
+        var ids = itemService.RemoveOrder(order.Id);
         dataBase.Orders.Remove(order);
         dataBase.Orders.UpdateRange(shift);
         dataBase.SaveChanges();
+        return ids;
     }
 
-    void IOrderService.Delete(Order order) => Delete(order);
+    List<Guid> IOrderService.Delete(Order order) => Delete(order);
 
-    void IOrderService.Delete(Guid id)
+    List<Guid> IOrderService.Delete(Guid id)
     {
         var order = dataBase.Orders.FirstOrDefault(p => p.Id == id);
-        if (order != null)
-        {
-            Delete(order);
-        }
+        return order != null ? Delete(order) : null;
     }
 
     private record DbSumByOrder(Guid? OrderId, decimal TotalSum, decimal Income);

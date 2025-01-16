@@ -11,8 +11,8 @@ public interface ISupplyService
     SupplyResponse Get(Guid supplyId);
     void Add(SupplyRequest supply);
     void Update(SupplyRequest supply);
-    void Delete(Supply supply);
-    void Delete(Guid supplyId);
+    List<Guid> Delete(Supply supply);
+    List<Guid> Delete(Guid supplyId);
 }
 
 internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService, ItemService itemService) : ISupplyService
@@ -163,7 +163,14 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         return item;
     }
 
-    internal void DeleteSupply(Supply supply)
+    /// <summary>
+    /// Deletes the specified supply along with its associated supply rows, updates the numbering of subsequent supplies for the same supplier,
+    /// and removes the supply from the database.
+    /// </summary>
+    /// <param name="supply">The supply to be deleted. Cannot be null.</param>
+    /// <returns>A list of product IDs of the deleted supply.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the provided supply is null.</exception>
+    internal List<Guid> DeleteSupply(Supply supply)
     {
         if (supply == null)
         {
@@ -184,11 +191,14 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         }
         dataBase.Supplies.Remove(supply);
         dataBase.Supplies.UpdateRange(shift);
+        return supply.State == SupplyState.Received || supply.State == SupplyState.SoldOut 
+            ? existingRows.Select(r => r.ProductId).ToList()
+            : null;
     }
 
-    internal void DeleteSupply(Guid supplyId)
+    internal List<Guid> DeleteSupply(Guid supplyId)
     {
-        DeleteSupply(dataBase.Supplies.FirstOrDefault(s => s.Id == supplyId));
+        return DeleteSupply(dataBase.Supplies.FirstOrDefault(s => s.Id == supplyId));
     }
 
 
@@ -240,20 +250,37 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         dataBase.SaveChanges();
     }
 
-    void ISupplyService.Delete(Guid supplyId)
+
+    /// <summary>
+    /// Deletes the specified supply along with its associated supply rows, updates the numbering of subsequent supplies for the same supplier,
+    /// and removes the supply from the database.
+    /// </summary>
+    /// <returns>A list of product IDs of the deleted supply.</returns>
+    List<Guid> ISupplyService.Delete(Guid supplyId)
     {
-        DeleteSupply(supplyId);
+        var list = DeleteSupply(supplyId);
         dataBase.SaveChanges();
+        return list;
     }
 
-    void ISupplyService.Delete(Supply supply)
+
+    /// <summary>
+    /// Deletes the specified supply along with its associated supply rows, updates the numbering of subsequent supplies for the same supplier,
+    /// and removes the supply from the database.
+    /// </summary>
+    /// <param name="supply">The supply to be deleted. Cannot be null.</param>
+    /// <returns>A list of product IDs of the deleted supply.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the provided supply is null.</exception>
+    List<Guid> ISupplyService.Delete(Supply supply)
     {
-        DeleteSupply(dataBase.Supplies.FirstOrDefault(s => s.Id == supply.Id));
+        var list = DeleteSupply(dataBase.Supplies.FirstOrDefault(s => s.Id == supply.Id));
         dataBase.SaveChanges();
+        return list;
     }
 
     public List<SupplyResponse> GetAll(Guid? supplierId)
     {
+        // TODO: Remove supply rows from here and move soldoutstate to suply and order save.
         var supplies = supplierId == null
             ? dataBase.Supplies.Include(s => s.Rows).OrderByDescending(s => s.Date).ToList()
             : dataBase.Supplies.Include(s => s.Rows).OrderByDescending(s => s.Date).Where(s => s.SupplierId == supplierId).ToList();

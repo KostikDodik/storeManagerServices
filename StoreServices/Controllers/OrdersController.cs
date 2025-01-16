@@ -6,9 +6,8 @@ using Model.Requests;
 namespace store_manager_backend.Controllers;
 
 [ApiController, Route("[controller]")]
-public class OrdersController: ControllerBase
+public class OrdersController(ProductsController productsController) : ControllerBase
 {
-    
     [HttpGet]
     public IActionResult GetAllOrders()
     {
@@ -50,7 +49,6 @@ public class OrdersController: ControllerBase
     public IActionResult DeleteOrder(Guid id)
     {
         using var dataService = new DataService();
-        dataService.Orders.Delete(id);
-        return NoContent();
+        return productsController.GetAvailableProducts(dataService.Orders.Delete(id));
     }
 }

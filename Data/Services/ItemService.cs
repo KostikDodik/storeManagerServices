@@ -129,14 +129,21 @@ internal class ItemService(DataDbContext dataBase) : IItemService
         Delete(GetBySupply(supplyId));
     }
 
-    internal void RemoveOrder(Guid orderId)
+    /// <summary>
+    /// CLeans items from sold status for removed order
+    /// </summary>
+    /// <param name="orderId"></param>
+    /// <returns>List of products</returns>
+    internal List<Guid> RemoveOrder(Guid orderId)
     {
-        GetByOrder(orderId).ForEach(item =>
+        var items = GetByOrder(orderId);
+        items.ForEach(item =>
         {
             item.OrderId = null;
             item.State = ItemState.Available;
             dataBase.Items.Update(item);
         });
+        return items.Select(i => i.ProductId).Distinct().ToList();
     }
 
     public List<Item> GetBySupply(Guid supplyId, Guid? productId = null) => productId == null 

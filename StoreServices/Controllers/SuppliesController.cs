@@ -6,7 +6,7 @@ using Model.Requests;
 namespace store_manager_backend.Controllers;
 
 [ApiController, Route("[controller]")]
-public class SuppliesController: ControllerBase
+public class SuppliesController(ProductsController productsController): ControllerBase
 {
     
     [HttpGet]
@@ -43,7 +43,6 @@ public class SuppliesController: ControllerBase
     public IActionResult DeleteSupply(Guid id)
     {
         using var dataService = new DataService();
-        dataService.Supplies.Delete(id);
-        return NoContent();
+        return productsController.GetAvailableProducts(dataService.Supplies.Delete(id));
     }
 }
