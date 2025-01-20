@@ -14,7 +14,8 @@ public interface IItemService
     public List<Item> GetAvailableByProduct(params Guid [] ids);
     List<Item> GetByOrder(Guid saleId);
     List<AvailableItemCount> GetAllAvailableCount(List<Guid> ids = null);
-    
+    List<Item> GetPage(Guid? productId = null, bool? onlyAvailable = null, ItemListOrder order = ItemListOrder.SupplyDateDescending, int page = 0);
+    int Count(Guid? productId = null, bool? onlyAvailable = null);
 }
 
 internal class ItemService(DataDbContext dataBase) : IItemService
@@ -193,5 +194,52 @@ internal class ItemService(DataDbContext dataBase) : IItemService
                 Id = gr.Key,
                 Value = gr.Any() && gr.All(i => i.State == ItemState.Finished)
             }).ToList().ToDictionary(o => o.Id, o => o.Value);
+    }
+    
+    const int pageSize = 10;
+
+    private IQueryable<Item> GetPageQuery(Guid? productId = null, bool? onlyAvailable = null)
+    {
+        IQueryable<Item> query = dataBase.Items;
+        if (productId != null)
+        {
+            query = query.Where(i => i.ProductId == productId);
+        }
+        if (onlyAvailable != null)
+        {
+            query = onlyAvailable.Value
+                ? query.Where(i => i.State == ItemState.Available)
+                : query.Where(i => i.State != ItemState.Available);
+        }
+
+        return query;
+    }
+
+    public List<Item> GetPage(Guid? productId = null, bool? onlyAvailable = null, ItemListOrder order = ItemListOrder.SupplyDateDescending, int page = 0)
+    {
+        var query = GetPageQuery(productId, onlyAvailable);
+        switch (order)
+        {
+            case ItemListOrder.SupplyDateDescending:
+                query = query.OrderByDescending(i => i.ReceivedDate);
+                break;
+            case ItemListOrder.SupplyDateAscending:
+                query = query.OrderBy(i => i.ReceivedDate);
+                break;
+            case ItemListOrder.StatusDescending:
+                query = query.OrderByDescending(i => i.UpdatedStatus);
+                break;
+            case ItemListOrder.StatusAscending:
+                query = query.OrderBy(i => i.UpdatedStatus);
+                break;
+        }
+        query = query.Skip(page * pageSize).Take(pageSize);
+        return query.ToList();
+    }
+
+    public int Count(Guid? productId = null, bool? onlyAvailable = null)
+    {
+        var query = GetPageQuery(productId, onlyAvailable);
+        return query.Count();
     }
 }
