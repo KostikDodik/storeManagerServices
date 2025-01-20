@@ -30,8 +30,7 @@ internal class ItemService(DataDbContext dataBase) : IItemService
         var now = DateTime.UtcNow;
         foreach (var item in items)
         {
-            item.ReceivedDate = item.UpdatedStatus = now;
-            dataBase.Items.Add(item);
+            Add(item);
         }
     }
     

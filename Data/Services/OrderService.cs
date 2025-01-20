@@ -76,6 +76,7 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         foreach (var item in items)
         {
             item.State = state;
+            item.UpdatedStatus = DateTime.UtcNow;
             item.OrderId = orderId;
             item.SalePrice = price;
             dataBase.Items.Update(item);
