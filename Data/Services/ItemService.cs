@@ -1,4 +1,5 @@
-﻿using Model.Database;
+﻿using Microsoft.EntityFrameworkCore;
+using Model.Database;
 using Model.Extentions;
 
 namespace Data.Services;
@@ -16,6 +17,7 @@ public interface IItemService
     List<AvailableItemCount> GetAllAvailableCount(List<Guid> ids = null);
     List<Item> GetPage(Guid? productId = null, bool? onlyAvailable = null, ItemListOrder order = ItemListOrder.SupplyDateDescending, int page = 0);
     int Count(Guid? productId = null, bool? onlyAvailable = null);
+    void UpdateBBDate(List<Guid> ids, DateTime date);
 }
 
 internal class ItemService(DataDbContext dataBase) : IItemService
@@ -231,6 +233,12 @@ internal class ItemService(DataDbContext dataBase) : IItemService
             case ItemListOrder.StatusAscending:
                 query = query.OrderBy(i => i.UpdatedStatus);
                 break;
+            case ItemListOrder.BBDDescending:
+                query = query.OrderByDescending(i => i.BBDate);
+                break;
+            case ItemListOrder.BBDAscending:
+                query = query.OrderBy(i => i.BBDate);
+                break;
         }
         query = query.Skip(page * pageSize).Take(pageSize);
         return query.ToList();
@@ -240,5 +248,12 @@ internal class ItemService(DataDbContext dataBase) : IItemService
     {
         var query = GetPageQuery(productId, onlyAvailable);
         return query.Count();
+    }
+
+    public void UpdateBBDate(List<Guid> ids, DateTime bbDate)
+    {
+        dataBase.Items.Where(i => ids.Contains(i.Id))
+            .ExecuteUpdate(s => s.SetProperty(i => i.BBDate, i => bbDate));
+        dataBase.SaveChanges();
     }
 }

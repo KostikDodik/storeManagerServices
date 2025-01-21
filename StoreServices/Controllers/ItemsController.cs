@@ -1,5 +1,6 @@
 ﻿using Data.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Model.Database;
 using Model.Requests;
 
@@ -23,5 +24,19 @@ public class ItemsController : ControllerBase
     {
         using var dataService = new DataService();
         return Ok(dataService.Items.Count(productId, onlyAvailable));
+    }
+
+    [HttpPost("bbdate")]
+    public IActionResult ChangeBBDate([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Disallow)] ChangeBBDateRequest data)
+    {
+        using var dataService = new DataService();
+        dataService.Items.UpdateBBDate(data.ItemIds, data.BBDate);
+        return Ok();
+    }
+    [HttpGet("supply")]
+    public IActionResult GetForSupply([FromQuery(Name = "supplyId")] Guid supplyId)
+    {
+        using var dataService = new DataService();
+        return Ok(dataService.Items.GetBySupply(supplyId));
     }
 }

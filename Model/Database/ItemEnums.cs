@@ -14,4 +14,6 @@ public enum ItemListOrder
     SupplyDateAscending = 1,
     StatusDescending = 2,
     StatusAscending = 3,
+    BBDDescending = 4,
+    BBDAscending = 5
 }
