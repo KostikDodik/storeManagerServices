@@ -18,6 +18,7 @@ public interface IItemService
     List<Item> GetPage(Guid? productId = null, bool? onlyAvailable = null, ItemListOrder order = ItemListOrder.SupplyDateDescending, int page = 0);
     int Count(Guid? productId = null, bool? onlyAvailable = null);
     void UpdateBBDate(List<Guid> ids, DateTime date);
+    List<Item> GetExpiringItems();
 }
 
 internal class ItemService(DataDbContext dataBase) : IItemService
@@ -255,5 +256,11 @@ internal class ItemService(DataDbContext dataBase) : IItemService
         dataBase.Items.Where(i => ids.Contains(i.Id))
             .ExecuteUpdate(s => s.SetProperty(i => i.BBDate, i => bbDate));
         dataBase.SaveChanges();
+    }
+
+    public List<Item> GetExpiringItems()
+    {
+        return dataBase.Items.Where(i => i.State == ItemState.Available && i.BBDate != null 
+            && EF.Functions.DateDiffDay(DateTime.UtcNow, i.BBDate) < 123).OrderBy(i => i.BBDate).ToList();
     }
 }

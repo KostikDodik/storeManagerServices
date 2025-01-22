@@ -39,4 +39,11 @@ public class ItemsController : ControllerBase
         using var dataService = new DataService();
         return Ok(dataService.Items.GetBySupply(supplyId));
     }
+    
+    [HttpGet("expiring")]
+    public IActionResult GetExpiringItems()
+    {
+        using var dataService = new DataService();
+        return Ok(dataService.Items.GetExpiringItems());
+    }
 }
