@@ -184,18 +184,33 @@ internal class ItemService(DataDbContext dataBase) : IItemService
     public List<Item> GetByOrder(Guid orderId) => 
         dataBase.Items.Where(i => i.OrderId == orderId).ToList();
 
-    internal Dictionary<Guid, bool> CheckSoldOutForSupply(List<Guid> ids)
+    private class BooleanPair
+    {
+        public Guid Id { get; set; }
+        public bool Value { get; set; }
+    }
+
+    internal Dictionary<Guid, bool> CheckSoldOutForSupply(List<Guid> ids, Dictionary<Guid, List<Item>> fetched = null)
     {
         if (ids == null || ids.Count == 0)
         {
             return new Dictionary<Guid, bool>();
         }
-        return dataBase.Items.Where(i => ids.Contains(i.SupplyId)).GroupBy(i => i.SupplyId)
-            .Select(gr => new
+        IEnumerable<BooleanPair> list = dataBase.Items.Where(i => ids.Contains(i.SupplyId)).GroupBy(i => i.SupplyId)
+            .Select(gr => new BooleanPair
             {
                 Id = gr.Key,
                 Value = gr.Any() && gr.All(i => i.State == ItemState.Finished)
-            }).ToList().ToDictionary(o => o.Id, o => o.Value);
+            }).ToList();
+        if (fetched != null)
+        {
+            list = list.Union(fetched.Select(pair => new BooleanPair
+            {
+                Id = pair.Key,
+                Value = pair.Value.Any() && pair.Value.All(i => i.State == ItemState.Finished)
+            }));
+        }
+        return list.ToDictionary(o => o.Id, o => o.Value);
     }
     
     const int pageSize = 10;

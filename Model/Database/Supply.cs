@@ -27,6 +27,8 @@ public class Supply: IDbEntity
     [Required]
     public int Number { get; set; }
     public virtual ICollection<SupplyRow> Rows { get; set; }
+    [JsonIgnore]
+    public virtual ICollection<Item> Items { get; set; }
 
     public SupplyState State { get; set; } = SupplyState.Paid;
     public decimal DeliveryFee { get; set; }

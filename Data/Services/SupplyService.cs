@@ -8,7 +8,7 @@ namespace Data.Services;
 public interface ISupplyService
 {
     List<SupplyResponse> GetAll(Guid? supplierId = null);
-    SupplyResponse Get(Guid supplyId);
+    DetailedSupplyResponse Get(Guid supplyId);
     void Add(SupplyRequest supply);
     void Update(SupplyRequest supply);
     List<Guid> Delete(Supply supply);
@@ -33,7 +33,7 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
 
     internal void UpdateSupply(SupplyRequest supply)
     {
-        var existing = dataBase.Supplies.FirstOrDefault(s => s.Id == supply.Id);
+        var existing = dataBase.Supplies.Include(s => s.Rows).FirstOrDefault(s => s.Id == supply.Id);
         if (existing == null)
         {
             return;
@@ -51,10 +51,10 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         }
 
         var num = existing.Number;
+        HandleReceivedItems(supply, existing);
         existing.CopyPossibleProperties(supply);
         existing.Number = num;
         UpdateRows(supply);
-        HandleReceivedItems(supply);
     }
 
     private void UpdateRows(Supply supply, bool newItem = false)
@@ -91,7 +91,7 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         }
     }
 
-    private void HandleReceivedItems(Supply supply)
+    private void HandleReceivedItems(Supply supply, Supply beforeUpdate = null)
     {
         if (supply.State != SupplyState.Received)
         {
@@ -104,6 +104,14 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         foreach (var row in supply.Rows)
         {
             var existing = existingDic.GetValueOrDefault(row.ProductId);
+            if (beforeUpdate != null && row.Id != default)
+            {
+                var rowBeforeUpdate = beforeUpdate.Rows.FirstOrDefault(r => r.Id == row.Id);
+                if (rowBeforeUpdate != null)
+                {
+                    existing = existing.Where(i => i.SupplyPrice == rowBeforeUpdate.SupplyPrice && i.DeliveryPrice == rowBeforeUpdate.DeliveryPrice).ToList();
+                }
+            }
             var existingCount = existing?.Count ?? 0;
             var difference = row.Count - existingCount;
             if (difference > 0)
@@ -219,22 +227,31 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         return q.ToList().ToDictionary(i => i.SupplyId);
     }
 
-    public SupplyResponse Get(Guid supplyId)
+    public DetailedSupplyResponse Get(Guid supplyId)
     {
-        var dbSupply = dataBase.Supplies.Include(s => s.Rows).FirstOrDefault(s => s.Id == supplyId);
+        var dbSupply = dataBase.Supplies
+            .Include(s => s.Rows)
+            .Include(s => s.Items)
+            .FirstOrDefault(s => s.Id == supplyId);
         if (dbSupply == null)
         {
             return null;
         }
         UpdateSoldOutState([dbSupply]);
         
-        var supply = dbSupply.ConvertFromDbEntity<SupplyResponse>();
-        supply.Rows = dbSupply.Rows;
-        var sum = GetSupplyItemsInfo([supplyId]).GetValueOrDefault(supplyId);
-        if (sum != null)
+        var supply = dbSupply.ConvertFromDbEntity<DetailedSupplyResponse>();
+        
+        var sum = new DbSumForSupply(supplyId,
+            dbSupply.Items.Sum(i => i.OrderId == null ? 0 : 1),
+            dbSupply.Items.Sum(i => i.SalePrice)
+        );
+        supply.CopyPossibleProperties(sum);
+        supply.Rows = dbSupply.Rows.Select(dbRow =>
         {
-            supply.CopyPossibleProperties(sum);
-        }
+            var row = dbRow.ConvertFromDbEntity<DetailedRow>();
+            row.InStock = dbSupply.Items.Where(i => i.ProductId == dbRow.ProductId).Count(i => i.OrderId == null);
+            return row;
+        }).ToList();
         return supply;
     }
 
@@ -303,8 +320,9 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
     private void UpdateSoldOutState(List<Supply> supplies)
     {
         supplies = supplies.Where(s => s.State != SupplyState.SoldOut).ToList();
-        var supplyIds = supplies.Select(s => s.Id).ToList();
-        var soldOutItems = itemService.CheckSoldOutForSupply(supplyIds);
+        var fetchedRows = supplies.Where(s => s.Items != null).ToDictionary(s => s.Id, s => s.Items.ToList());
+        var supplyIds = supplies.Where(s => s.Items == null).Select(s => s.Id).ToList();
+        var soldOutItems = itemService.CheckSoldOutForSupply(supplyIds, fetchedRows);
         foreach (var supply in supplies)
         {
             if (soldOutItems.TryGetValue(supply.Id, out var soldOut) && soldOut)
