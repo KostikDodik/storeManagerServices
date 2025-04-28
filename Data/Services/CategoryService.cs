@@ -19,11 +19,14 @@ public interface ICategoryService
     Category Get(Guid id);
 }   
 
-internal class CategoryService(DataDbContext dataBase) : ICategoryService
+internal class CategoryService(DataDbContext dataBase, CommissionUtilityService commissionUtilityService) : ICategoryService
 {
+    private const string AllKey = "AllCategoriesTree";
+    
     internal void Add(Category category)
     {
         dataBase.Categories.Add(category);
+        Cache.Remove(AllKey);
     }
 
     void ICategoryService.Add(Category category)
@@ -41,6 +44,7 @@ internal class CategoryService(DataDbContext dataBase) : ICategoryService
         }
         existing.CopyPossibleProperties(category);
         dataBase.Categories.Update(existing);
+        Cache.Remove(AllKey);
     }
 
     void ICategoryService.Update(Category category)
@@ -55,7 +59,9 @@ internal class CategoryService(DataDbContext dataBase) : ICategoryService
         {
             Delete(child);
         }
+        commissionUtilityService.Delete(category);
         dataBase.Categories.Remove(category);
+        Cache.Remove(AllKey);
     }
 
     void ICategoryService.Delete(Category category)
@@ -78,8 +84,8 @@ internal class CategoryService(DataDbContext dataBase) : ICategoryService
         Delete(id);
         dataBase.SaveChanges();
     }
-
-    internal List<Category> GetAll() => dataBase.Categories.Include(c => c.Children).Where(c => c.ParentId == null).ToList();
+    internal List<Category> GetAll() => Cache.GetOrCreate(AllKey, 
+        () => dataBase.Categories.Include(c => c.Children).Where(c => c.ParentId == null).ToList());
 
     List<Category> ICategoryService.GetAll() => GetAll();
 

@@ -13,12 +13,14 @@ public interface ISalePlatformService
     void Delete(Guid salePlatformId);
 }
 
-internal class SalePlatformService(DataDbContext dataBase) : ISalePlatformService
+internal class SalePlatformService(DataDbContext dataBase, CommissionUtilityService commissionUtilityService) : ISalePlatformService
 {
+    private const string CacheKey = "SalePlatforms";
     void ISalePlatformService.Add(SalePlatform salePlatform)
     {
         dataBase.SalePlatforms.Add(salePlatform);
         dataBase.SaveChanges();
+        Cache.Remove(CacheKey);
     }
 
     void ISalePlatformService.Update(SalePlatform salePlatform)
@@ -34,26 +36,32 @@ internal class SalePlatformService(DataDbContext dataBase) : ISalePlatformServic
         dataBase.SaveChanges();
     }
 
-    void ISalePlatformService.Delete(SalePlatform salePlatform)
+    private void Delete(SalePlatform salePlatform)
     {
         if (dataBase.Orders.Any(s => s.SalePlatformId == salePlatform.Id))
         {
             throw new InvalidOperationException("This Sale Platform already has active sales");
         }
+        commissionUtilityService.Delete(salePlatform);
+        commissionUtilityService.ClearSalePlatformCache(salePlatform.Id);
         dataBase.SalePlatforms.Remove(salePlatform);
+    }
+
+    void ISalePlatformService.Delete(SalePlatform salePlatform)
+    {
+        Delete(salePlatform);
         dataBase.SaveChanges();
     }
 
     void ISalePlatformService.Delete(Guid id)
     {
         var salePlatform = dataBase.SalePlatforms.FirstOrDefault(p => p.Id == id);
-        if (salePlatform != null)
-        {
-            dataBase.SalePlatforms.Remove(salePlatform);
-            dataBase.SaveChanges();
-        }
+        if (salePlatform == null) return;
+        Delete(salePlatform);
+        dataBase.SaveChanges();
     }
+    internal List<SalePlatform> GetAll() => Cache.GetOrCreate(CacheKey, () => dataBase.SalePlatforms.ToList());
 
-    List<SalePlatform> ISalePlatformService.GetAll() => dataBase.SalePlatforms.ToList();
+    List<SalePlatform> ISalePlatformService.GetAll() => GetAll();
     SalePlatform ISalePlatformService.Get(Guid id) => dataBase.SalePlatforms.FirstOrDefault(s => s.Id == id);
 }

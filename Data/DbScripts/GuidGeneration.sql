@@ -38,3 +38,19 @@ IF NOT EXISTS(SELECT * FROM sys.default_constraints WHERE name = 'DF_Items_Id')
         ALTER TABLE Items
             ADD CONSTRAINT DF_Items_Id DEFAULT NEWID() FOR Id;
     END
+IF NOT EXISTS(SELECT * FROM sys.default_constraints WHERE name = 'DF_Checks_Id')
+    BEGIN
+        ALTER TABLE Checks
+            ADD CONSTRAINT DF_Checks_Id DEFAULT NEWID() FOR Id;
+    END
+IF NOT EXISTS(SELECT * FROM sys.default_constraints WHERE name = 'DF_CommissionCategories_Id')
+    BEGIN
+        ALTER TABLE CommissionCategories
+            ADD CONSTRAINT DF_CommissionCategories_Id DEFAULT NEWID() FOR Id;
+    END
+IF NOT EXISTS(SELECT * FROM sys.default_constraints WHERE name = 'DF_Commissions_Id')
+    BEGIN
+        ALTER TABLE Commissions
+            ADD CONSTRAINT DF_Commissions_Id DEFAULT NEWID() FOR Id;
+    END
+    

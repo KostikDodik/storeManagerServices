@@ -1,4 +1,5 @@
-﻿using Model.Database;
+﻿using Microsoft.EntityFrameworkCore;
+using Model.Database;
 using Model.Extentions;
 using Model.Requests;
 
@@ -16,81 +17,8 @@ public interface IOrderService
     List<Guid> Delete(Guid saleId);
 }
 
-internal class OrderService(DataDbContext dataBase, ItemService itemService) : IOrderService
+internal partial class OrderService(DataDbContext dataBase, ItemService itemService, CheckService checkService, CommissionService commissionService) : IOrderService
 {
-    private void HandleOrderItems(OrderRequest order, bool edit = false)
-    {
-        var availableDic = itemService.GetAvailableGroupedByProduct(order.Rows.Select(r => r.ProductId).ToArray());
-        var existingDic = edit ? itemService.GetGroupedByOrder(order.Id) : null;
-        var productIds = new List<Guid>();
-        foreach (var orderRow in order.Rows)
-        {
-            var existing = edit ? existingDic.GetValueOrDefault(orderRow.ProductId) : null;
-            var existingCount = existing?.Count ?? 0;
-            var difference = orderRow.Quantity - existingCount;
-            if (difference > 0)
-            {
-                AddNewItemsToOrder(availableDic, orderRow, difference, order);
-            }
-            else if (difference < 0)
-            {
-                RemoveSurplusItems(ref existing, -difference);
-            }
-            UpdateExistingItems(existing, order, orderRow);
-            productIds.Add(orderRow.ProductId);
-        }
-
-        if (existingDic != null)
-        {
-            var removed = existingDic.Where(p => !productIds.Contains(p.Key))
-                .SelectMany(p => p.Value).ToList();
-            RemoveSurplusItems(ref removed);
-        }
-    }
-
-    private void AddNewItemsToOrder(
-        Dictionary<Guid, List<Item>> availableDic,
-        OrderRow orderRow,
-        int difference,
-        OrderRequest order)
-    {
-        if (!availableDic.TryGetValue(orderRow.ProductId, out var available) || available.Count < difference)
-        {
-            throw new InvalidOperationException($"There are not enough of items for productId \"{orderRow.ProductId}\"");
-        }
-
-        UpdateItemDetails(available.Take(difference), order.State, order.Id, orderRow.Price);
-    }
-
-    private void RemoveSurplusItems(ref List<Item> existing, int? difference = null)
-    {
-        UpdateItemDetails(existing!.TakeLast(difference ?? existing.Count));
-        existing = existing.TakeWhile(i => i.OrderId != null).ToList();
-    }
-
-    private void UpdateItemDetails(IEnumerable<Item> items,
-        ItemState state = ItemState.Available,
-        Guid? orderId = null,
-        decimal price = 0)
-    {
-        foreach (var item in items)
-        {
-            item.State = state;
-            item.UpdatedStatus = DateTime.UtcNow;
-            item.OrderId = orderId;
-            item.SalePrice = price;
-            dataBase.Items.Update(item);
-        }
-    }
-
-    private void UpdateExistingItems(List<Item> existing, OrderRequest order, OrderRow orderRow)
-    {
-        if (existing != null)
-        {
-            UpdateItemDetails(existing, order.State, order.Id, orderRow.Price);
-        }
-    }
-
     Order IOrderService.Add(OrderRequest order)
     {
         var dbOrder = order as Order;
@@ -100,6 +28,7 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         dbOrder.Number = dataBase.Orders.Count(o => o.SalePlatformId == order.SalePlatformId) + 1;
         dataBase.Orders.Add(dbOrder);
         dataBase.SaveChanges();
+        HandleChecks(order);
         HandleOrderItems(order);
         dataBase.SaveChanges();
         return order;
@@ -123,8 +52,9 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         existing.CopyPossibleProperties(order);
         existing.Number = num;
         dataBase.Orders.Update(existing);
-        dataBase.SaveChanges();
-        HandleOrderItems(order, true);
+        var existingItems = itemService.GetGroupedByOrder(order.Id);
+        HandleChecks(order, existingItems);
+        HandleOrderItems(order, existingItems);
         dataBase.SaveChanges();
     }
     
@@ -136,6 +66,7 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
             shiftedOrder.Number--;
         }
         var ids = itemService.RemoveOrder(order.Id);
+        checkService.RemoveOrder(order.Id);
         dataBase.Orders.Remove(order);
         dataBase.Orders.UpdateRange(shift);
         dataBase.SaveChanges();
@@ -160,8 +91,8 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         return query.GroupBy(i => i.OrderId)
             .Select(g => new DbSumByOrder(
                 g.Key,
-                g.Sum(i => i.SalePrice),
-                g.Sum(i => i.SalePrice - i.DeliveryPrice - i.SupplyPrice))).ToList()
+                g.Sum(i => (i.NetSum > 0 ? i.NetSum : i.SalePrice)),
+                g.Sum(i => (i.NetSum > 0 ? i.NetSum : i.SalePrice) - i.DeliveryPrice - i.SupplyPrice))).ToList()
             .ToDictionary(i => i.OrderId);
     }
     
@@ -184,7 +115,7 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
 
     OrderResponse IOrderService.Get(Guid id)
     {
-        var order = dataBase.Orders.FirstOrDefault(s => s.Id == id);
+        var order = dataBase.Orders.Include(o => o.Checks).FirstOrDefault(s => s.Id == id);
         if (order == null)
         {
             return null;
@@ -194,11 +125,15 @@ internal class OrderService(DataDbContext dataBase, ItemService itemService) : I
         {
             TotalCheck = item?.TotalSum ?? 0,
             TotalIncome = item?.Income ?? 0,
-            Rows = itemService.GetByOrder(id).GroupBy(i => i.ProductId).Select(g => new OrderRow
+            Rows = itemService.GetByOrder(id).GroupBy(i => i.ProductId).Select(g =>
             {
-                ProductId = g.Key,
-                Quantity = g.Count(),
-                Price = g.First().SalePrice
+                return new OrderRow
+                {
+                    ProductId = g.Key,
+                    Quantity = g.Count(),
+                    Price = g.First().SalePrice,
+                    NetSum = g.First().NetSum
+                };
             }).ToList()
         };
     }

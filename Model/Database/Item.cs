@@ -32,6 +32,7 @@ public class Item: IDbEntity
     public decimal SupplyPrice { get; set; }
     public decimal DeliveryPrice { get; set; }
     public decimal SalePrice { get; set; }
+    public decimal NetSum { get; set; }
     public DateTime? BBDate { get; set; }
 }
 

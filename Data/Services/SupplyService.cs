@@ -74,13 +74,13 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         foreach (var row in supply.Rows)
         {
             var existingRow = existingRows.FirstOrDefault(r => r.Id == row.Id);
+            row.SupplyId = supply.Id;
             if (existingRow != null)
             {
                 existingRow.UpdateDbEntity(row);
             }
             else
             {
-                row.SupplyId = supply.Id;
                 rowService.Add(row);
             }
         }
@@ -109,13 +109,14 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
                 var rowBeforeUpdate = beforeUpdate.Rows.FirstOrDefault(r => r.Id == row.Id);
                 if (rowBeforeUpdate != null)
                 {
-                    existing = existing.Where(i => i.SupplyPrice == rowBeforeUpdate.SupplyPrice && i.DeliveryPrice == rowBeforeUpdate.DeliveryPrice).ToList();
+                    existing = existing?.Where(i => i.SupplyPrice == rowBeforeUpdate.SupplyPrice && i.DeliveryPrice == rowBeforeUpdate.DeliveryPrice).ToList();
                 }
             }
             var existingCount = existing?.Count ?? 0;
             var difference = row.Count - existingCount;
             if (difference > 0)
             {
+                row.SupplyId = supply.Id;
                 AddNewItems(row, difference);
             }
             else if (difference < 0)
@@ -222,7 +223,7 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
             .Select(g => new DbSumForSupply(
                 g.Key,
                 g.Sum(i => i.OrderId == null ? 0 : 1),
-                g.Sum(i => i.SalePrice))
+                g.Sum(i => (i.NetSum > 0 ? i.NetSum : i.SalePrice)))
             );
         return q.ToList().ToDictionary(i => i.SupplyId);
     }
@@ -243,7 +244,7 @@ internal class SupplyService(DataDbContext dataBase, SupplyRowService rowService
         
         var sum = new DbSumForSupply(supplyId,
             dbSupply.Items.Sum(i => i.OrderId == null ? 0 : 1),
-            dbSupply.Items.Sum(i => i.SalePrice)
+            dbSupply.Items.Sum(i => (i.NetSum > 0 ? i.NetSum : i.SalePrice))
         );
         supply.CopyPossibleProperties(sum);
         supply.Rows = dbSupply.Rows.Select(dbRow =>

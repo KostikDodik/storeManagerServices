@@ -25,4 +25,5 @@ public class Category: IDbEntity
     public Category Parent { get; set; }
     
     public virtual ICollection<Category> Children { get; set; }
+    public virtual ICollection<CommissionCategory> CommissionCategories { get; set; }
 }

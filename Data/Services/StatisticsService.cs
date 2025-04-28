@@ -40,7 +40,7 @@ internal class StatisticsService(DataDbContext dataBase) : IStatisticsService
                 CategoryId = gr.Key.CategoryId,
                 SalesCount = gr.Sum(i => 1),
                 Income = gr.Sum(i => i.SalePrice),
-                NetProfit = gr.Sum(i => i.SalePrice - i.SupplyPrice - i.DeliveryPrice)
+                NetProfit = gr.Sum(i => (i.NetSum > 0 ? i.NetSum : i.SalePrice) - i.SupplyPrice - i.DeliveryPrice)
             });
         return grouped.ToList();
     }

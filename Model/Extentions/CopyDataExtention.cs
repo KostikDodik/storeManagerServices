@@ -12,7 +12,7 @@ namespace Model.Extentions
         /// <typeparam name="TTo">Returning model's type</typeparam>
         /// <returns><see cref="TTo"/> object</returns>
         public static TTo ConvertFromDbEntity<TTo>(this IDbEntity dbEntity)
-            where TTo : IModelEntity, new()
+            where TTo : class, IModelEntity, new()
         {
             var result = new TTo();
             if (result is ISpecificInfoFromDbEntity specific)
@@ -42,7 +42,7 @@ namespace Model.Extentions
         /// <typeparam name="TTo">Returning db entity's type</typeparam>
         /// <returns><see cref="TTo"/> object</returns>
         public static TTo ConvertToDbEntity<TTo>(this IModelEntity modelEntity)
-            where TTo : IDbEntity, new()
+            where TTo : class, IDbEntity, new()
         {
             var result = new TTo().CopyPossibleProperties(modelEntity);
             if (modelEntity is ISpecificInfoToDbEntity specific)
@@ -62,7 +62,7 @@ namespace Model.Extentions
         /// <returns>Passed <see cref="TTo"/> object with updated data</returns>
         public static TTo UpdateDbEntity<TTo, TFrom>(this TTo dbEntity, TFrom modelEntity)
             where TFrom : class
-            where TTo : IDbEntity, new()
+            where TTo : class, IDbEntity
         {
             var result = dbEntity.CopyPossibleProperties(modelEntity);
             if (modelEntity is ISpecificInfoToDbEntity specific)
@@ -81,16 +81,10 @@ namespace Model.Extentions
         /// <exception cref="ArgumentNullException"></exception>
         public static TTo CopyPossibleProperties<TTo, TFrom>(this TTo to, TFrom from)
             where TFrom : class
-            where TTo : new()
+            where TTo : class
         {
-            if (to == null)
-            {
-                throw new ArgumentNullException(nameof(to));
-            }
-            if (from == null)
-            {
-                throw new ArgumentNullException(nameof(from));
-            }
+            ArgumentNullException.ThrowIfNull(to);
+            ArgumentNullException.ThrowIfNull(from);
 
             // We are not using typeof because typeof will give us interface
             var fromType = from.GetType();
@@ -137,22 +131,16 @@ namespace Model.Extentions
         /// <exception cref="ArgumentNullException"></exception>
         private static void SetPropertyFromGetter<TFrom, TTo>(TFrom getObj, TTo setObj, PropertyInfo get, PropertyInfo set)
             where TFrom : class
-            where TTo : new()
+            where TTo : class
         {
             if (get.PropertyType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(get.PropertyType))
             {
                 // Avoid copying db rows
                 return;
             }
-            
-            if (getObj == null)
-            {
-                throw new ArgumentNullException(nameof(getObj));
-            }
-            if (setObj == null)
-            {
-                throw new ArgumentNullException(nameof(setObj));
-            }
+
+            ArgumentNullException.ThrowIfNull(getObj);
+            ArgumentNullException.ThrowIfNull(setObj);
 
             var setMethod = set?.GetSetMethod();
             var getMethod = get?.GetGetMethod();

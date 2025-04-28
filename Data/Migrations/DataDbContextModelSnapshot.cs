@@ -47,6 +47,77 @@ namespace Data.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("Model.Database.Check", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CheckLink")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("PaymentType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Sum")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("Checks");
+                });
+
+            modelBuilder.Entity("Model.Database.CommissionCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SalePlatformId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("SalePlatformId");
+
+                    b.ToTable("CommissionCategories");
+                });
+
+            modelBuilder.Entity("Model.Database.CommissionSize", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Commission")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("CommissionCategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("PriceOver")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommissionCategoryId");
+
+                    b.ToTable("Commissions");
+                });
+
             modelBuilder.Entity("Model.Database.Item", b =>
                 {
                     b.Property<Guid>("Id")
@@ -57,6 +128,9 @@ namespace Data.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal>("DeliveryPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("NetSum")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid?>("OrderId")
@@ -284,6 +358,47 @@ namespace Data.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("Model.Database.Check", b =>
+                {
+                    b.HasOne("Model.Database.Order", "Order")
+                        .WithMany("Checks")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("Model.Database.CommissionCategory", b =>
+                {
+                    b.HasOne("Model.Database.Category", "Category")
+                        .WithMany("CommissionCategories")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Model.Database.SalePlatform", "SalePlatform")
+                        .WithMany()
+                        .HasForeignKey("SalePlatformId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("SalePlatform");
+                });
+
+            modelBuilder.Entity("Model.Database.CommissionSize", b =>
+                {
+                    b.HasOne("Model.Database.CommissionCategory", "CommissionCategory")
+                        .WithMany("CommissionSizes")
+                        .HasForeignKey("CommissionCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CommissionCategory");
+                });
+
             modelBuilder.Entity("Model.Database.Item", b =>
                 {
                     b.HasOne("Model.Database.Order", "Order")
@@ -297,7 +412,7 @@ namespace Data.Migrations
                         .IsRequired();
 
                     b.HasOne("Model.Database.Supply", "Supply")
-                        .WithMany()
+                        .WithMany("Items")
                         .HasForeignKey("SupplyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -364,6 +479,18 @@ namespace Data.Migrations
             modelBuilder.Entity("Model.Database.Category", b =>
                 {
                     b.Navigation("Children");
+
+                    b.Navigation("CommissionCategories");
+                });
+
+            modelBuilder.Entity("Model.Database.CommissionCategory", b =>
+                {
+                    b.Navigation("CommissionSizes");
+                });
+
+            modelBuilder.Entity("Model.Database.Order", b =>
+                {
+                    b.Navigation("Checks");
                 });
 
             modelBuilder.Entity("Model.Database.Supplier", b =>
@@ -373,6 +500,8 @@ namespace Data.Migrations
 
             modelBuilder.Entity("Model.Database.Supply", b =>
                 {
+                    b.Navigation("Items");
+
                     b.Navigation("Rows");
                 });
 #pragma warning restore 612, 618

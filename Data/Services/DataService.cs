@@ -15,9 +15,12 @@ public class DataService : IDisposable, IAsyncDisposable
             return _dbContext;
         }
     }
+    
+    private CommissionUtilityService _commissionUtility;
+    private CommissionUtilityService commissionUtilityService => _commissionUtility ??= new CommissionUtilityService(dbContext);
 
     private CategoryService _categories;
-    private CategoryService categories => _categories ??= new CategoryService(dbContext);
+    private CategoryService categories => _categories ??= new CategoryService(dbContext, commissionUtilityService);
     public ICategoryService Categories => categories;
 
     private ProductService _products;
@@ -41,11 +44,20 @@ public class DataService : IDisposable, IAsyncDisposable
     public ISupplyService Supplies => supplies;
 
     private SalePlatformService _salePlatforms;
-    private SalePlatformService salePlatforms => _salePlatforms ??= new SalePlatformService(dbContext);
+    private SalePlatformService salePlatforms => _salePlatforms ??= new SalePlatformService(dbContext, commissionUtilityService);
     public ISalePlatformService SalePlatforms => salePlatforms;
     
+    private CheckService _checks;
+    private CheckService checks => _checks ??= new CheckService(dbContext);
+    public ICheckService Checks => checks;
+    
+    private CommissionService _commissions;
+    private CommissionService commissions => _commissions ??= 
+        new CommissionService(dbContext, categories, salePlatforms, commissionUtilityService);
+    public ICommissionService Commissions => commissions;
+    
     private OrderService _orders;
-    private OrderService orders => _orders ??= new OrderService(dbContext, items);
+    private OrderService orders => _orders ??= new OrderService(dbContext, items, checks, commissions);
     public IOrderService Orders => orders;
     
     private StatisticsService _statistics;

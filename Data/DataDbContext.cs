@@ -31,5 +31,7 @@ internal class DataDbContext : DbContext
     public DbSet<Order> Orders { get; set; }
     
     public DbSet<Item> Items { get; set; }
-    
+    public DbSet<Check> Checks { get; set; }
+    public DbSet<CommissionCategory> CommissionCategories { get; set; }
+    public DbSet<CommissionSize> Commissions { get; set; }
 }

@@ -25,6 +25,7 @@ public class Order: IDbEntity
     public SalePlatform SalePlatform { get; set; }
     [Required]
     public int Number { get; set; }
+    public ICollection<Check> Checks { get; set; }
 
     public ItemState State { get; set; } = ItemState.Ordered;
 }
